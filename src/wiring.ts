@@ -314,6 +314,7 @@ import { createCodexHarness, codexHarnessConfigOptions } from "./harness/codex-h
 import { keychainCodexAuthStore, fileCodexAuthStore, type CodexAuthStore } from "./harness/codex-auth-store.ts";
 import { keychainHarnessAuthEnv } from "./credentials/harness-auth-env.ts";
 import { createClaudeHarness, claudeHarnessConfigOptions } from "./harness/claude-harness.ts";
+import { createEveHarness, eveHarnessConfigOptions } from "./harness/eve-harness.ts";
 import { createPiHarness, piHarnessConfigOptions, type ProviderKeys } from "./harness/pi-harness.ts";
 import { createHarnessRouter, resolveRuntimeChoiceDurable } from "./harness/harness-router.ts";
 import { selectableModelCatalog } from "./model/model-catalog.ts";
@@ -1436,6 +1437,13 @@ export function buildApp(
         signals: runSignals,
         tasks,
         mcpTools,
+      }),
+    ],
+    [
+      "eve",
+      createEveHarness({
+        ...eveHarnessConfigOptions(config),
+        signals: runSignals,
       }),
     ],
     ["mock", createMockHarness()],

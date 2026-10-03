@@ -69,7 +69,7 @@ export interface Config {
   databasePoolCaCert?: string;
   databasePoolMax?: number;
   databaseDirectPoolMax?: number;
-  harness: "mock" | "pi" | "opencode" | "codex" | "claude";
+  harness: "mock" | "pi" | "opencode" | "codex" | "claude" | "eve";
   securityPosture: SecurityPosture;
   sandboxResourcesEnabled: boolean;
   sharingPosture: SharingPosture;
@@ -93,6 +93,13 @@ export interface Config {
   claudeModel?: string;
   claudeBinPath?: string;
   claudeProcessEnv: NodeJS.ProcessEnv;
+  eveModel?: string;
+  eveBinPath?: string;
+  /** Root of the eve application (a project with instructions.md) the harness spawns `eve acp` in. */
+  eveAppRoot?: string;
+  /** URL of an already-running eve deployment to bridge via `eve acp --url` instead of a local app root. */
+  eveUrl?: string;
+  eveProcessEnv: NodeJS.ProcessEnv;
   detectModelId?: string;
   titleModelId?: string;
   judgeModelId?: string;
@@ -220,6 +227,7 @@ export function configuredModelForHarness(config: Config, harness: string): stri
   if (harness === "codex") return config.codexModel;
   if (harness === "claude") return config.claudeModel;
   if (harness === "opencode") return config.opencodeModel;
+  if (harness === "eve") return config.eveModel ?? config.modelId;
   return config.modelId;
 }
 
@@ -987,10 +995,17 @@ function orgBrandingFromEnv(env: NodeJS.ProcessEnv): Config["brandingDefault"] {
 function harnessEnvStrict(value: string | undefined): Config["harness"] {
   if (value === undefined || value.trim() === "") return "mock";
   const harness = value.trim();
-  if (harness === "mock" || harness === "pi" || harness === "opencode" || harness === "codex" || harness === "claude")
+  if (
+    harness === "mock" ||
+    harness === "pi" ||
+    harness === "opencode" ||
+    harness === "codex" ||
+    harness === "claude" ||
+    harness === "eve"
+  )
     return harness;
   throw new Error(
-    `HARNESS=${JSON.stringify(value)} is not recognized — use mock, pi, opencode, codex, or claude, or unset it.`,
+    `HARNESS=${JSON.stringify(value)} is not recognized — use mock, pi, opencode, codex, claude, or eve, or unset it.`,
   );
 }
 
@@ -1423,6 +1438,28 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       "CLAUDE_CODE_OAUTH_TOKEN",
     ].flatMap((name) => (env[name] === undefined ? [] : [[name, env[name]]])),
   ) as NodeJS.ProcessEnv;
+  // eve runs its own model gateway (Vercel AI Gateway by default), so the
+  // harness process is handed gateway/Vercel credentials instead of qm's
+  // per-provider keys.
+  const eveProcessEnv = Object.fromEntries(
+    [
+      "PATH",
+      "TMPDIR",
+      "LANG",
+      "LC_ALL",
+      "SSL_CERT_FILE",
+      "SSL_CERT_DIR",
+      "NODE_EXTRA_CA_CERTS",
+      "HTTP_PROXY",
+      "HTTPS_PROXY",
+      "NO_PROXY",
+      "ALL_PROXY",
+      "HOME",
+      "AI_GATEWAY_API_KEY",
+      "VERCEL_TOKEN",
+      "EVE_VERCEL_SCOPE",
+    ].flatMap((name) => (env[name] === undefined ? [] : [[name, env[name]]])),
+  ) as NodeJS.ProcessEnv;
   if (providerBaseUrls.openai) codexProcessEnv.OPENAI_BASE_URL = providerBaseUrls.openai;
   if (providerBaseUrls.anthropic) claudeProcessEnv.ANTHROPIC_BASE_URL = providerBaseUrls.anthropic;
   const turnWallClockMs =
@@ -1499,6 +1536,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ...(env.CLAUDE_MODEL ? { claudeModel: env.CLAUDE_MODEL } : {}),
     ...(env.CLAUDE_BIN ? { claudeBinPath: env.CLAUDE_BIN } : {}),
     claudeProcessEnv,
+    ...(env.EVE_MODEL ? { eveModel: env.EVE_MODEL } : {}),
+    ...(env.EVE_BIN ? { eveBinPath: env.EVE_BIN } : {}),
+    ...(env.EVE_APP_ROOT?.trim() ? { eveAppRoot: env.EVE_APP_ROOT.trim() } : {}),
+    ...(env.EVE_URL?.trim() ? { eveUrl: env.EVE_URL.trim() } : {}),
+    eveProcessEnv,
     ...(env.PI_DETECT_MODEL ? { detectModelId: env.PI_DETECT_MODEL } : {}),
     ...(env.PI_TITLE_MODEL ? { titleModelId: env.PI_TITLE_MODEL } : {}),
     ...(env.PI_JUDGE_MODEL ? { judgeModelId: env.PI_JUDGE_MODEL } : {}),
